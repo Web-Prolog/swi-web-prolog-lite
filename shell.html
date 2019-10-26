@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Web Prolog</title>
+        <meta name="description" content="">
+        <meta name="author" content="Torbjörn Lager">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="shortcut icon" href="/favicon.ico">
+        <link rel="stylesheet" href="https://unpkg.com/jquery.terminal/css/jquery.terminal.min.css"/>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" 
+              integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" 
+              crossorigin="anonymous">
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" 
+                integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" 
+                crossorigin="anonymous"></script>
+        <style>
+            #shell {
+                position: absolute;
+                top: 50px;
+                bottom: 46px;
+                right: 0;
+                width: 100%;
+            }
+
+            #controls {
+                position: absolute;
+                bottom: 0px;
+                width: 100%;
+                padding: 12px;
+                border-top: 1px solid gray;
+                background-color: #f5f5f5;
+            }
+            
+            .terminal {
+                --color: rgba(0, 0, 0, 0.99);
+                --background: white;
+            }
+            .terminal h1, .terminal h2, .terminal h3, .terminal h4, .terminal h5, .terminal h6, .terminal pre, .cmd {
+                margin: 0; 
+            }
+            .terminal h1, .terminal h2, .terminal h3, .terminal h4, .terminal h5, .terminal h6 {
+                line-height: 1.2em;
+            }
+			
+        </style>
+    </head>
+    <body>
+        <header class="navbar navbar-default navbar-fixed-top">
+            <div class="container pull-left">
+                <div class="navbar-header">
+                    <a href="/" class="navbar-brand"><b><span style="color:maroon">Web Prolog</span> &mdash; a node running the ISOBASE profile</b></a>
+                </div>
+            </div>
+        </header>
+       <div id="shell"></div>
+       <div id="controls" onclick="return false">
+            <button id="ask-btn" class="btn btn-xs btn-primary">Ask</button>
+            <button id="next-btn" class="btn btn-xs btn-success" disabled>Next</button>
+            <button id="stop-btn" class="btn btn-xs btn-warning" disabled>Stop</button>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The node-resident program is stored at <a href="#" onclick='window.open("/src");return false;'>/src</a> (opens in a new tab).
+        </div>
+        <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+        <script src="https://unpkg.com/jquery.terminal/js/jquery.terminal.min.js"></script>
+        <script>
+			var offset = 0;
+            var gterm;
+            var gprocess;
+            var state = 1;
+            var currcommand = "";
+    
+            function to_text(data) {
+                var text = [];
+                var hasBindings = false;
+                for (var key in data) {
+                    var value = data[key];
+                    if (Array.isArray(value)) {
+                        value = "[" + value + "]";
+                    }
+                    if (value.charAt(0) != "_") {
+                        text.push(key + " = " + value);
+                        text.push(", \n");
+                        hasBindings = true;
+                    }
+                }
+                text.pop(); // get rid of the last comma
+                text.push(" ");
+                if (hasBindings) {
+                    return text.join("");
+                } else {
+                    return "true ";
+                }
+            }
+            function report(data) {
+                return to_text(data[0]);
+            }
+    
+            function disableButtons(ask, next, stop) {
+                $("#ask-btn").prop("disabled", ask);
+                $("#next-btn").prop("disabled", next);
+                $("#stop-btn").prop("disabled", stop);
+            }
+
+            $(document).ready(function($) {
+                $('#shell').terminal(function(command, term) {
+					function process(event) {
+						console.log(event);
+						term.resume();
+						if (event.type === 'success') {
+						    if (event.more) {
+						        state = 4;
+						        term.set_prompt(report(event.data));
+						        disableButtons(true, false, false);
+						    } else {
+						        state = 1;
+						        term.echo(report(event.data).trim() + ".");
+						        term.set_prompt(myprompt);
+								currcommand = "";
+								offset = 0;
+						        disableButtons(false, true, true);
+						    }
+						    term.scroll_to_bottom();
+						} else if (event.type === 'failure') {
+	                        state = 1;
+	                        term.echo("false.");
+	                        term.set_prompt(myprompt);
+							currcommand = "";
+							offset = 0;
+	                        term.scroll_to_bottom();
+	                        disableButtons(false, true, true);							
+						} else if (event.type === 'error') {
+	                        state = 1;
+	                        term.error(event.data);
+	                        term.set_prompt(myprompt);
+							currcommand = "";
+							offset = 0;
+	                        term.scroll_to_bottom();
+	                        disableButtons(false, true, true);
+						}
+					}
+					gprocess = process;
+                    myprompt = " \n?- ";
+                    if (state == 1) {
+                        if (command.trim() == "") {
+                            term.set_prompt(myprompt);
+                            term.scroll_to_bottom();
+                            disableButtons(false, true, true);
+                        } else if (command.trim().endsWith('.')) {
+                            currcommand += command.trim().slice(0, -1);
+                            state = 2;
+							$.ajax({
+  							  url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
+							  success: function(event) {process(event)}
+							});
+                            term.pause();
+                            disableButtons(true, true, true);
+                        } else {
+                            term.set_prompt("   ");
+                            currcommand += command; 
+                        }
+                    } else if (state == 4) {
+                        if (command == ";") {
+                            state = 2;
+							offset = offset + 1;
+							$.ajax({
+							  url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
+							  success: function(event) {process(event)}
+							});
+                            term.pause();
+                            disableButtons(true, true, true);
+                        } else if (command == "") {
+							term.update(-1, term.get_prompt().trim() + ".");
+							currcommand = "";
+							offset = 0;
+	                        //term.resume();
+	                        state = 1;
+	                        term.set_prompt(myprompt);
+	                        term.scroll_to_bottom();
+	                        disableButtons(false, true, true);
+                        }
+                    } 
+                 }, {
+                     greetings:'Welcome to SWI Web Prolog!\n',
+                     prompt:'?- ',
+                     onInit: function(term) {
+                         gterm = term;
+                     },
+                     keypress: function(e) {
+                         if (state == 4 && (e.which == 59 || e.which == 32)) {
+                             gterm.echo(gterm.get_prompt() + ";");
+							 offset = offset + 1;
+							 console.log(offset);
+ 							 $.ajax({
+ 							   url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
+ 							   success: function(event) {gprocess(event)}
+ 							 });
+                             // term.pause();
+                             disableButtons(true, true, true);
+                             return false;
+                         }
+                     },
+                     convertLinks: false,
+                     historyFilter: function(command) {
+                         if (command == "" ) return false;
+                         if (command == ";" ) return false;
+                         return true;
+                     }
+                 }); 
+                 
+                 
+                // Event handlers: Console
+
+                $("#ask-btn").on("click", function() {
+                    gterm.exec(gterm.before_cursor().trim());
+                    gterm.set_command("");
+                    setTimeout(gterm.enable, 0);
+                });
+
+                $("#next-btn").on("click", function() {
+                    gterm.exec(";");
+                    setTimeout(gterm.enable, 0);
+                });
+
+                $("#stop-btn").on("click", function() {
+                    gterm.exec("");
+                    setTimeout(gterm.enable, 0);
+                });
+
+
+
+            });
+        </script>
+    </body>
+</html>
