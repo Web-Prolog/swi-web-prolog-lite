@@ -22,7 +22,7 @@ rpc(Query, Offset, Limit, QueryAtom, Parts, Options) :-
       | Parts
     ]),
     setup_call_cleanup(
-        http_open(ExpandedURI, Stream, []),
+        http_open(ExpandedURI, Stream, Options),
         read(Stream, Answer), 
         close(Stream)),
     wait_answer(Answer, Query, Offset, Limit, QueryAtom, Parts, Options).
