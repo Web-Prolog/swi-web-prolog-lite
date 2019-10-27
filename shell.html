@@ -146,13 +146,13 @@
                             term.scroll_to_bottom();
                             disableButtons(false, true, true);
                         } else if (command.trim().endsWith('.')) {
+                            term.pause();
                             currcommand += command.trim().slice(0, -1);
                             state = 2;
                             $.ajax({
                                 url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
                               success: function(event) {process(event)}
                             });
-                            term.pause();
                             disableButtons(true, true, true);
                         } else {
                             term.set_prompt("   ");
@@ -160,13 +160,13 @@
                         }
                     } else if (state == 4) {
                         if (command == ";") {
+                            term.pause();
                             state = 2;
                             offset = offset + 1;
                             $.ajax({
                               url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
                               success: function(event) {process(event)}
                             });
-                            term.pause();
                             disableButtons(true, true, true);
                         } else if (command == "") {
                             term.update(-1, term.get_prompt().trim() + ".");
@@ -187,14 +187,13 @@
                      },
                      keypress: function(e) {
                          if (state == 4 && (e.which == 59 || e.which == 32)) {
+							 term.pause();
                              gterm.echo(gterm.get_prompt() + ";");
                              offset = offset + 1;
-                             console.log(offset);
                               $.ajax({
                                 url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
                                 success: function(event) {gprocess(event)}
                               });
-                             // term.pause();
                              disableButtons(true, true, true);
                              return false;
                          }
