@@ -42,7 +42,7 @@
             .terminal h1, .terminal h2, .terminal h3, .terminal h4, .terminal h5, .terminal h6 {
                 line-height: 1.2em;
             }
-			
+            
         </style>
     </head>
     <body>
@@ -63,7 +63,7 @@
         <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
         <script src="https://unpkg.com/jquery.terminal/js/jquery.terminal.min.js"></script>
         <script>
-			var offset = 0;
+            var offset = 0;
             var gterm;
             var gprocess;
             var state = 1;
@@ -103,42 +103,42 @@
 
             $(document).ready(function($) {
                 $('#shell').terminal(function(command, term) {
-					function process(event) {
-						console.log(event);
-						term.resume();
-						if (event.type === 'success') {
-						    if (event.more) {
-						        state = 4;
-						        term.set_prompt(report(event.data));
-						        disableButtons(true, false, false);
-						    } else {
-						        state = 1;
-						        term.echo(report(event.data).trim() + ".");
-						        term.set_prompt(myprompt);
-								currcommand = "";
-								offset = 0;
-						        disableButtons(false, true, true);
-						    }
-						    term.scroll_to_bottom();
-						} else if (event.type === 'failure') {
-	                        state = 1;
-	                        term.echo("false.");
-	                        term.set_prompt(myprompt);
-							currcommand = "";
-							offset = 0;
-	                        term.scroll_to_bottom();
-	                        disableButtons(false, true, true);							
-						} else if (event.type === 'error') {
-	                        state = 1;
-	                        term.error(event.data);
-	                        term.set_prompt(myprompt);
-							currcommand = "";
-							offset = 0;
-	                        term.scroll_to_bottom();
-	                        disableButtons(false, true, true);
-						}
-					}
-					gprocess = process;
+                    function process(event) {
+                        console.log(event);
+                        term.resume();
+                        if (event.type === 'success') {
+                            if (event.more) {
+                                state = 4;
+                                term.set_prompt(report(event.data));
+                                disableButtons(true, false, false);
+                            } else {
+                                state = 1;
+                                term.echo(report(event.data).trim() + ".");
+                                term.set_prompt(myprompt);
+                                currcommand = "";
+                                offset = 0;
+                                disableButtons(false, true, true);
+                            }
+                            term.scroll_to_bottom();
+                        } else if (event.type === 'failure') {
+                            state = 1;
+                            term.echo("false.");
+                            term.set_prompt(myprompt);
+                            currcommand = "";
+                            offset = 0;
+                            term.scroll_to_bottom();
+                            disableButtons(false, true, true);                            
+                        } else if (event.type === 'error') {
+                            state = 1;
+                            term.error(event.data);
+                            term.set_prompt(myprompt);
+                            currcommand = "";
+                            offset = 0;
+                            term.scroll_to_bottom();
+                            disableButtons(false, true, true);
+                        }
+                    }
+                    gprocess = process;
                     myprompt = " \n?- ";
                     if (state == 1) {
                         if (command.trim() == "") {
@@ -148,10 +148,10 @@
                         } else if (command.trim().endsWith('.')) {
                             currcommand += command.trim().slice(0, -1);
                             state = 2;
-							$.ajax({
-  							  url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
-							  success: function(event) {process(event)}
-							});
+                            $.ajax({
+                                url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
+                              success: function(event) {process(event)}
+                            });
                             term.pause();
                             disableButtons(true, true, true);
                         } else {
@@ -161,22 +161,22 @@
                     } else if (state == 4) {
                         if (command == ";") {
                             state = 2;
-							offset = offset + 1;
-							$.ajax({
-							  url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
-							  success: function(event) {process(event)}
-							});
+                            offset = offset + 1;
+                            $.ajax({
+                              url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
+                              success: function(event) {process(event)}
+                            });
                             term.pause();
                             disableButtons(true, true, true);
                         } else if (command == "") {
-							term.update(-1, term.get_prompt().trim() + ".");
-							currcommand = "";
-							offset = 0;
-	                        //term.resume();
-	                        state = 1;
-	                        term.set_prompt(myprompt);
-	                        term.scroll_to_bottom();
-	                        disableButtons(false, true, true);
+                            term.update(-1, term.get_prompt().trim() + ".");
+                            currcommand = "";
+                            offset = 0;
+                            //term.resume();
+                            state = 1;
+                            term.set_prompt(myprompt);
+                            term.scroll_to_bottom();
+                            disableButtons(false, true, true);
                         }
                     } 
                  }, {
@@ -188,12 +188,12 @@
                      keypress: function(e) {
                          if (state == 4 && (e.which == 59 || e.which == 32)) {
                              gterm.echo(gterm.get_prompt() + ";");
-							 offset = offset + 1;
-							 console.log(offset);
- 							 $.ajax({
- 							   url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
- 							   success: function(event) {gprocess(event)}
- 							 });
+                             offset = offset + 1;
+                             console.log(offset);
+                              $.ajax({
+                                url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
+                                success: function(event) {gprocess(event)}
+                              });
                              // term.pause();
                              disableButtons(true, true, true);
                              return false;
