@@ -55,9 +55,9 @@
 %:- debug(cache).
 %:- debug(err).
 
-:- http_handler(/,            http_reply_file('shell.html', []), []         ).
-:- http_handler(root(src),    http_reply_file('src.pl',     []), []         ).
-:- http_handler(root(ask),    http_ask,                          [spawn([])]).
+:- http_handler(/,         http_reply_file('shell.html', []), []         ).
+:- http_handler(root(src), http_reply_file('src.pl',     []), []         ).
+:- http_handler(root(ask), http_ask,                          [spawn([])]).
 
 
 :- setting(cache_maxsize, integer, 100, 'Max number of cache entries').
@@ -73,12 +73,12 @@ http_ask(Request) :-
           format(Format, [atom, default(json)])
         ]),
     catch(read_term_from_atom(GoalAtom, Goal, [variable_names(Bindings)]), Error, true),
-	(	var(Error)
-	->	fix_template(Format, Goal, Bindings, NewTemplate), 
-    	find_answer(NewTemplate, Goal, Offset, Limit, Answer), 
-		output_result(Format, Answer)
-	;	output_result(Format, error(Error))
-	).
+    (    var(Error)
+    ->   fix_template(Format, Goal, Bindings, NewTemplate), 
+         find_answer(NewTemplate, Goal, Offset, Limit, Answer), 
+         output_result(Format, Answer)
+    ;    output_result(Format, error(Error))
+    ).
 
 
 %!  fix_template(+Format, +Template, +Bindings, -NewTemplate) is det.
@@ -109,8 +109,8 @@ anon(Name=_) :-
 json_lang(json) :- !.
 json_lang(Format) :-
     sub_atom(Format, 0, _, _, 'json-').
-		
-	
+        
+    
 %!  output_result(+Format, +EventTerm) is det.
 %!  output_result(+Format, +EventTerm, +OptionsDict) is det.
 %
@@ -121,7 +121,7 @@ output_result(prolog, Answer) :-
     !,
     format('Content-type: text/plain; charset=UTF-8~n~n'),
     write_term(Answer, [ 
-	    quoted(true),
+        quoted(true),
         ignore_ops(true),
         fullstop(true),
         nl(true),
@@ -129,14 +129,14 @@ output_result(prolog, Answer) :-
         portray_goal(portray_blob)
     ]).
 output_result(json, Answer) :-
-	answer_to_json(Answer, JSON),
-	reply_json(JSON).
-	
+    answer_to_json(Answer, JSON),
+    reply_json(JSON).
+    
 
 answer_to_json(success(Bindings0, More), json{type:success, data:Bindings, more:More}) :-
-	maplist(bindings_to_json_strings, Bindings0, Bindings).
+    maplist(bindings_to_json_strings, Bindings0, Bindings).
 answer_to_json(error(ErrorTerm), json{type:error, data:ErrorString}) :-
-	message_to_string(ErrorTerm, ErrorString).
+    message_to_string(ErrorTerm, ErrorString).
 answer_to_json(failure, json{type:failure}).
 
 
@@ -164,129 +164,115 @@ term_string_value(N-V, N-A) :-
 %
 
 find_answer(Template, Query, Offset, Limit, Answer) :-
-	debug(cache, 'Query: ~p', [Query]),
-	thread_self(Self),
-	do_random_delay,
+    debug(cache, 'Query: ~p', [Query]),
+    thread_self(Self),
     query_id(Query, QueryID),
     (   with_mutex(cache, retract(cache(QueryID, Offset, Pid)))
     ->  next(Pid, Self, Limit)
     ;   ask(Template, Query, Offset, Limit, Pid)
     ),
-	wait_for_answer(Self, Pid, QueryID, Offset, Limit, Answer),
-	debug(cache, '~@', [print_cache]),
+    wait_for_answer(Self, Pid, QueryID, Offset, Limit, Answer),
+    debug(cache, '~@', [print_cache]),
     setting(cache_maxsize, MaxSize),
     get_flag(cache_size, Size),
     (   Size > MaxSize
     ->  setting(cache_remprop, RemProp),
-	    Mtop is integer(MaxSize*RemProp),
-		once(findnsols(Mtop, Pid0, with_mutex(cache, cache(_, _, Pid0)), Pids)),
+        Mtop is integer(MaxSize*RemProp),
+        once(findnsols(Mtop, Pid0, with_mutex(cache, cache(_, _, Pid0)), Pids)),
         with_mutex(cache, maplist(kill_thread, Pids)) 
     ;   true
     ).
 
 
-
-/*
-    (   Size > MaxSize
-    ->  with_mutex(cache, retractall(cache(_,_,Pid))), 
-	    kill_thread(Pid)
-    ;   true
-    ).
-*/
-	
+    
 query_id(Term, QueryID) :-
     copy_term(Term, QueryID0),
     numbervars(QueryID0, 0, _),
-	term_hash(QueryID0, QueryID).
-	
+    term_hash(QueryID0, QueryID).
+    
 
 wait_for_answer(Self, Pid, QueryID, Offset, Limit, Answer) :-
-	do_random_delay,
-	setting(timeout, Timeout),
-	(	thread_get_message(Self, Answer, [timeout(Timeout)])
-	->	(	Answer = success(_, true)
-		->  Index is Offset + Limit,
-			with_mutex(cache, assertz(cache(QueryID, Index, Pid)))
-			% Here's where we perhaps should do the pruning of the cache
-			% when size > maxsize
-		;	true
-		)
-	;	Answer = error(error(timeout_exceeded, Timeout)),
-	    kill_thread(Pid)
-	).	
+    setting(timeout, Timeout),
+    (   thread_get_message(Self, Answer, [timeout(Timeout)])
+    ->  (   Answer = success(_, true)
+        ->  Index is Offset + Limit,
+            with_mutex(cache, assertz(cache(QueryID, Index, Pid)))
+        ;   true
+        )
+    ;   Answer = error(error(timeout_exceeded, Timeout)),
+        kill_thread(Pid)
+    ).    
 
 perhaps_prune_cache :-
     setting(cache_maxsize, MaxSize),
     get_flag(cache_size, Size),
     (   Size > MaxSize
     ->  with_mutex(cache, retract(cache(_,_,Pid))), 
-	    kill_thread(Pid)
+        kill_thread(Pid)
     ;   true
     ).
 
 print_cache :-
-	listing(cache/3), 
-	get_flag(cache_size, S), 
-	format('Cache size: ~p', [S]).
+    listing(cache/3), 
+    get_flag(cache_size, S), 
+    format('Cache size: ~p', [S]).
 
 
 kill_thread(Pid) :-
-	do_random_delay,
-	% Use catch/3 since Pid may be dead already
-	catch(thread_detach(Pid), _, true),
-	catch(thread_signal(Pid, thread_exit(Pid)), _, true).
-	
-	
+    % Use catch/3 since Pid may be dead already
+    catch(thread_detach(Pid), _, true),
+    catch(thread_signal(Pid, thread_exit(Pid)), _, true).
+    
+    
 ask(Template, Query, Offset, Limit, Pid) :-
-	thread_self(Self),
+    thread_self(Self),
     thread_create(query(Template, Query, Offset, Limit, Self), Pid, [
-		at_exit(done(Pid))
+        at_exit(done(Pid))
     ]),
-	flag(cache_size, N, N+1).
-	
-	
+    flag(cache_size, N, N+1).
+    
+    
 query(Template, Query, Offset, Limit, Parent) :-
-	catch(guarded_query(Template, Query, Offset, Limit, Parent), Error, 
-		  thread_send_message(Parent, error(Error))).
-	
+    catch(guarded_query(Template, Query, Offset, Limit, Parent), Error, 
+          thread_send_message(Parent, error(Error))).
+    
 guarded_query(Template, Query, Offset, Limit, Parent) :-
-	do_random_delay,
-	State = count(Limit),
-	Target = target(Parent),
-	(    call_cleanup(solve(Template, Query, Offset, State, Solutions), Det=true),
-	     arg(1, Target, Parent2),
-		 (   var(Det)
-		 ->  thread_send_message(Parent2, success(Solutions, true)),
-		     thread_get_message(next(Parent3, Count)),
-		 	 nb_setarg(1, State, Count),
-		 	 nb_setarg(1, Target, Parent3),
-		 	 fail
-		 ;   thread_send_message(Parent2, success(Solutions, false))
-		 )
-	;    arg(1, Target, Parent2),
-	     thread_send_message(Parent2, failure)
-	).
-	
+    State = count(Limit),
+    Target = target(Parent),
+    (   call_cleanup(solve(Template, Query, Offset, State, Solutions), Det=true),
+        arg(1, Target, Parent2),
+        (   var(Det)
+        ->  thread_send_message(Parent2, success(Solutions, true)),
+            thread_get_message(next(Parent3, Count)),
+            nb_setarg(1, State, Count),
+            nb_setarg(1, Target, Parent3),
+            fail
+        ;   thread_send_message(Parent2, success(Solutions, false))
+        )
+    ;   arg(1, Target, Parent2),
+        thread_send_message(Parent2, failure)
+    ).
+    
 
 solve(Template, Query, Offset, State, Solutions) :-
-	safe_goal(Query),
-	findnsols(State, Template, offset(Offset, src:Query), Solutions),
-	Solutions \== [].
-	
+    safe_goal(Query),
+    findnsols(State, Template, offset(Offset, src:Query), Solutions),
+    Solutions \== [].
+    
 
 done(Pid) :-
-	debug(cache, 'REMOVING ~p', [Pid]),
-	with_mutex(cache, retractall(cache(_, _, Pid))),
-	flag(cache_size, N, N-1),
-	catch(thread_detach(Pid), _, true).
+    debug(cache, 'REMOVING ~p', [Pid]),
+    with_mutex(cache, retractall(cache(_, _, Pid))),
+    flag(cache_size, N, N-1),
+    catch(thread_detach(Pid), _, true).
 
 
 
 next(Pid, Parent, Limit) :-
-	thread_send_message(Pid, next(Parent, Limit)).
+    thread_send_message(Pid, next(Parent, Limit)).
 
     
-	
+    
 :- multifile
     sandbox:safe_primitive/1.
 
@@ -297,14 +283,6 @@ sandbox:safe_primitive(system:get_flag(_,_)).
 :- multifile
     prolog:message//1.
 
-/*
-prolog:message(error(permission_error(call,sandboxed,P),_)) -->
-    {functor(P, F, N)},
-    [ 'Error: The predicate ~p/~p is not defined.'-[F, N]].
-prolog:message(error(existence_error(procedure,_:P),_)) -->
-    {functor(P, F, N)},
-    [ 'Error: The predicate ~p/~p is not defined.'-[F, N]].
-*/
 
 prolog:message(error(timeout_exceeded, Timeout)) -->
     [ 'Error: Time limit (~ps) exceeded.'-[Timeout]].
@@ -312,24 +290,20 @@ prolog:message(error(timeout_exceeded, Timeout)) -->
 
 nodeinfo([ 
       profile(isobase),
-	  timeout(Timeout),
-	  cache_maxsize(MaxSize),
-	  cache_cursize(Size)
+      timeout(Timeout),
+      cache_maxsize(MaxSize),
+      cache_cursize(Size)
   ]) :-
-    setting(timeout, Timeout),	
+    setting(timeout, Timeout),    
     setting(cache_maxsize, MaxSize),
-	get_flag(cache_size, Size).
-	
-	
-server(Port) :-	
+    get_flag(cache_size, Size).
+    
+    
+server(Port) :-    
     http_server(http_dispatch, [
-   		 port(Port),
-		 workers(48)
-   ]).
+         port(Port),
+         workers(24)
+    ]).
   
-do_random_delay :-
-    Delay is random(20)/1000,
-    sleep(Delay).
-	
 
 :- server(3010).
