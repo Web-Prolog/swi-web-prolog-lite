@@ -157,11 +157,8 @@ term_string_value(N-V, N-A) :-
 
 
 
-%!  find_answer(:Query, +Offset, +Limit, -Answer) is det.
+%!  find_answer(+Template, +Query, +Offset, +Limit, -Answer) is det.
 
-%   - Caching provided by pengines ensures a fast return of
-%     consequtive answers. 
-%
 
 find_answer(Template, Query, Offset, Limit, Answer) :-
     debug(cache, 'Query: ~p', [Query]),
@@ -183,47 +180,13 @@ find_answer(Template, Query, Offset, Limit, Answer) :-
     ;   true
     ).
 
-
-    
 query_id(Term, QueryID) :-
     copy_term(Term, QueryID0),
     numbervars(QueryID0, 0, _),
     term_hash(QueryID0, QueryID).
     
 
-wait_for_answer(Self, Pid, QueryID, Offset, Limit, Answer) :-
-    setting(timeout, Timeout),
-    (   thread_get_message(Self, Answer, [timeout(Timeout)])
-    ->  (   Answer = success(_, true)
-        ->  Index is Offset + Limit,
-            with_mutex(cache, assertz(cache(QueryID, Index, Pid)))
-        ;   true
-        )
-    ;   Answer = error(error(timeout_exceeded, Timeout)),
-        kill_thread(Pid)
-    ).    
 
-perhaps_prune_cache :-
-    setting(cache_maxsize, MaxSize),
-    get_flag(cache_size, Size),
-    (   Size > MaxSize
-    ->  with_mutex(cache, retract(cache(_,_,Pid))), 
-        kill_thread(Pid)
-    ;   true
-    ).
-
-print_cache :-
-    listing(cache/3), 
-    get_flag(cache_size, S), 
-    format('Cache size: ~p', [S]).
-
-
-kill_thread(Pid) :-
-    % Use catch/3 since Pid may be dead already
-    catch(thread_detach(Pid), _, true),
-    catch(thread_signal(Pid, thread_exit(Pid)), _, true).
-    
-    
 ask(Template, Query, Offset, Limit, Pid) :-
     thread_self(Self),
     thread_create(query(Template, Query, Offset, Limit, Self), Pid, [
@@ -267,11 +230,35 @@ done(Pid) :-
     catch(thread_detach(Pid), _, true).
 
 
-
 next(Pid, Parent, Limit) :-
     thread_send_message(Pid, next(Parent, Limit)).
 
+
+
+wait_for_answer(Self, Pid, QueryID, Offset, Limit, Answer) :-
+    setting(timeout, Timeout),
+    (   thread_get_message(Self, Answer, [timeout(Timeout)])
+    ->  (   Answer = success(_, true)
+        ->  Index is Offset + Limit,
+            with_mutex(cache, assertz(cache(QueryID, Index, Pid)))
+        ;   true
+        )
+    ;   Answer = error(error(timeout_exceeded, Timeout)),
+        kill_thread(Pid)
+    ).
+
+print_cache :-
+    listing(cache/3), 
+    get_flag(cache_size, S), 
+    format('Cache size: ~p', [S]).
+
+
+kill_thread(Pid) :-
+    % Use catch/3 since Pid may be dead already
+    catch(thread_detach(Pid), _, true),
+    catch(thread_signal(Pid, thread_exit(Pid)), _, true).
     
+        
     
 :- multifile
     sandbox:safe_primitive/1.
