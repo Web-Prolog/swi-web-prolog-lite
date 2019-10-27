@@ -159,20 +159,10 @@
                             currcommand += command; 
                         }
                     } else if (state == 4) {
-                        if (command == ";") {
-                            term.pause();
-                            state = 2;
-                            offset = offset + 1;
-                            $.ajax({
-                              url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
-                              success: function(event) {process(event)}
-                            });
-                            disableButtons(true, true, true);
-                        } else if (command == "") {
+                        if (command == "") {
                             term.update(-1, term.get_prompt().trim() + ".");
                             currcommand = "";
                             offset = 0;
-                            //term.resume();
                             state = 1;
                             term.set_prompt(myprompt);
                             term.scroll_to_bottom();
@@ -187,10 +177,9 @@
                      },
                      keypress: function(e) {
                          if (state == 4 && (e.which == 59 || e.which == 32)) {
-							 term.pause();
                              gterm.echo(gterm.get_prompt() + ";");
                              offset = offset + 1;
-                              $.ajax({
+                             $.ajax({
                                 url:"http://localhost:3010/ask?query=" + encodeURIComponent(currcommand) + "&offset=" + offset,
                                 success: function(event) {gprocess(event)}
                               });
