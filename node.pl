@@ -188,11 +188,15 @@ query_id(Term, QueryID) :-
 
 
 ask(Template, Query, Offset, Limit, Pid) :-
+    uuid(Pid),
     thread_self(Self),
-    thread_create(query(Template, Query, Offset, Limit, Self), Pid, [
+    thread_create(query(Template, Query, Offset, Limit, Self), _Pid, [
+	    alias(Pid),
         at_exit(done(Pid))
     ]),
     flag(cache_size, N, N+1).
+	
+
     
     
 query(Template, Query, Offset, Limit, Parent) :-
