@@ -290,11 +290,11 @@ nodeinfo([
     get_flag(cache_size, Size).
     
     
-server(Port) :-    
+server(Host, Port) :-    
     http_server(http_dispatch, [
-         port(Port),
+         port(Host:Port),
          workers(24)
     ]).
   
 
-:- server(3010).
+:- server('localhost',3010).
