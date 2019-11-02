@@ -61,7 +61,6 @@
 
 
 :- setting(cache_maxsize, integer, 100, 'Max number of cache entries').
-:- setting(cache_remprop, number,  0.1, 'Proportion of old cache entries to remove when cache_size > cache_maxsize').
 :- setting(timeout,       number,  1,   'Timeout in seconds').
 
 
@@ -169,8 +168,6 @@ find_answer(Template, Query, Offset, Limit, Answer) :-
     ;   ask(Template, Query, Offset, Limit, Pid)
     ),
     wait_for_answer(Self, Pid, QueryID, Offset, Limit, Answer),
-    debug(cache, '~@', [print_cache]),
-    setting(cache_maxsize, MaxSize),
     get_flag(cache_size, Size),
     (   Size > MaxSize
     ->  setting(cache_remprop, RemProp),
@@ -197,6 +194,7 @@ ask(Template, Query, Offset, Limit, Pid) :-
     flag(cache_size, N, N+1).
 	
 
+:- endif.
     
     
 query(Template, Query, Offset, Limit, Parent) :-
@@ -227,11 +225,11 @@ solve(Template, Query, Offset, State, Solutions) :-
     Solutions \== [].
     
 
-done(Pid) :-
-    debug(cache, 'REMOVING ~p', [Pid]),
-    with_mutex(cache, retractall(cache(_, _, Pid))),
-    flag(cache_size, N, N-1),
-    catch(thread_detach(Pid), _, true).
+done :-
+    retractall(cache(_, _, Me)),
+    debug(cache, 'DONE: ~p', [Me]),
+    thread_detach(Me),
+    flag(cache_size, N, N-1).
 
 
 next(Pid, Parent, Limit) :-
@@ -244,7 +242,7 @@ wait_for_answer(Self, Pid, QueryID, Offset, Limit, Answer) :-
     (   thread_get_message(Self, Answer, [timeout(Timeout)])
     ->  (   Answer = success(_, true)
         ->  Index is Offset + Limit,
-            with_mutex(cache, assertz(cache(QueryID, Index, Pid)))
+            assertz(cache(QueryID, Index, Pid)),
         ;   true
         )
     ;   Answer = error(error(timeout_exceeded, Timeout)),
@@ -295,6 +293,5 @@ server(Host, Port) :-
          port(Host:Port),
          workers(24)
     ]).
-  
 
 :- server('localhost',3010).
