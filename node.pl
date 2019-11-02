@@ -155,27 +155,19 @@ term_string_value(N-V, N-A) :-
 
 
 
-
 %!  find_answer(+Template, +Query, +Offset, +Limit, -Answer) is det.
-
 
 find_answer(Template, Query, Offset, Limit, Answer) :-
     debug(cache, 'Query: ~p', [Query]),
     thread_self(Self),
     query_id(Query, QueryID),
-    (   with_mutex(cache, retract(cache(QueryID, Offset, Pid)))
+    (   retract(cache(QueryID, Offset, Pid))
     ->  next(Pid, Self, Limit)
     ;   ask(Template, Query, Offset, Limit, Pid)
     ),
     wait_for_answer(Self, Pid, QueryID, Offset, Limit, Answer),
-    get_flag(cache_size, Size),
-    (   Size > MaxSize
-    ->  setting(cache_remprop, RemProp),
-        Mtop is integer(MaxSize*RemProp),
-        once(findnsols(Mtop, Pid0, with_mutex(cache, cache(_, _, Pid0)), Pids)),
-        with_mutex(cache, maplist(kill_thread, Pids)) 
-    ;   true
-    ).
+	debug(cache, '~@', [print_cache]).
+
 
 query_id(Term, QueryID) :-
     copy_term(Term, QueryID0),
@@ -185,16 +177,26 @@ query_id(Term, QueryID) :-
 
 
 ask(Template, Query, Offset, Limit, Pid) :-
-    uuid(Pid),
+    pengine_uuid(Pid),
     thread_self(Self),
     thread_create(query(Template, Query, Offset, Limit, Self), _Pid, [
 	    alias(Pid),
-        at_exit(done(Pid))
+        at_exit(done)
     ]),
     flag(cache_size, N, N+1).
 	
 
+:- if(current_predicate(uuid/2)).
+pengine_uuid(Id) :-
+    uuid(Id, [version(4)]).             % Version 4 is random.
+:- else.
+:- use_module(library(random)).
+pengine_uuid(Id) :-
+    Max is 1<<128,
+    random_between(0, Max, Num),
+    atom_number(Id, Num).
 :- endif.
+
     
     
 query(Template, Query, Offset, Limit, Parent) :-
@@ -226,6 +228,7 @@ solve(Template, Query, Offset, State, Solutions) :-
     
 
 done :-
+    thread_self(Me),
     retractall(cache(_, _, Me)),
     debug(cache, 'DONE: ~p', [Me]),
     thread_detach(Me),
@@ -243,6 +246,7 @@ wait_for_answer(Self, Pid, QueryID, Offset, Limit, Answer) :-
     ->  (   Answer = success(_, true)
         ->  Index is Offset + Limit,
             assertz(cache(QueryID, Index, Pid)),
+			perhaps_prune_cache
         ;   true
         )
     ;   Answer = error(error(timeout_exceeded, Timeout)),
@@ -253,6 +257,16 @@ print_cache :-
     listing(cache/3), 
     get_flag(cache_size, S), 
     format('Cache size: ~p', [S]).
+
+
+perhaps_prune_cache :-
+    setting(cache_maxsize, MaxSize),
+    get_flag(cache_size, Size),
+    (   Size > MaxSize
+    ->  retract(cache(_, _, Pid)), 
+	    kill_thread(Pid)
+    ;   true
+    ). 
 
 
 kill_thread(Pid) :-
